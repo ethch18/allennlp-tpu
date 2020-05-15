@@ -9,6 +9,7 @@ import re
 import subprocess
 
 from torch import cuda
+import torch_xla
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
@@ -85,6 +86,24 @@ def check_for_gpu(device_id: Union[int, list]):
             raise ConfigurationError(f"Experiment specified GPU device {device_id}"
                                      f" but there are only {num_devices_available} devices "
                                      f" available.")
+
+def check_for_tpu(device_id: Union[int, list]):
+    device_id = parse_cuda_device(device_id)
+    if isinstance(device_id, list):
+        for did in device_id:
+            check_for_tpu(did)
+    elif device_id is not None and device_id >= 0:
+        # skip the CPU
+        num_devices_available = len(torch_xla._XLAC._xla_get_devices()) - 1
+        if num_devices_available == 0:
+            raise ConfigurationError("Experiment specified a TPU but none is available;"
+                                     " if you want to run on CPU use the override"
+                                     " 'trainer.cuda_device=-1' in the json config file.")
+        elif device_id >= num_devices_available:
+            raise ConfigurationError(f"Experiment specified TPU device {device_id}"
+                                     f" but there are only {num_devices_available} devices "
+                                     f" available.")
+
 
 
 def check_for_java() -> bool:

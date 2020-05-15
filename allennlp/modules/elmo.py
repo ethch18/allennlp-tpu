@@ -663,7 +663,8 @@ class _ElmoBiLm(torch.nn.Module):
             # constructor, it will probably happen on the CPU. This isn't too bad,
             # because it's only a few convolutions and will likely be very fast.
             if device >= 0:
-                batched_tensor = batched_tensor.cuda(device)
+                # batched_tensor = batched_tensor.cuda(device)
+                batched_tensor = batched_tensor.to(device)
             output = self._token_embedder(batched_tensor)
             token_embedding = output["token_embedding"]
             mask = output["mask"]

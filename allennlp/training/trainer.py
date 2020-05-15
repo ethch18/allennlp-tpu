@@ -51,6 +51,7 @@ class Trainer(TrainerBase):
                  checkpointer: Checkpointer = None,
                  model_save_interval: float = None,
                  cuda_device: Union[int, List] = -1,
+                 use_tpu: bool = False,
                  grad_norm: Optional[float] = None,
                  grad_clipping: Optional[float] = None,
                  learning_rate_scheduler: Optional[LearningRateScheduler] = None,
@@ -124,7 +125,10 @@ class Trainer(TrainerBase):
             seconds within single epochs.  In all cases, models are also saved
             at the end of every epoch if ``serialization_dir`` is provided.
         cuda_device : ``Union[int, List[int]]``, optional (default = -1)
-            An integer or list of integers specifying the CUDA device(s) to use. If -1, the CPU is used.
+            An integer or list of integers specifying the CUDA device(s) to use.
+            If -1, the CPU is used.
+        use_tpu : ``bool``, (default = False)
+            Whether to use TPU
         grad_norm : ``float``, optional, (default = None).
             If provided, gradient norms will be rescaled to have a maximum of this value.
         grad_clipping : ``float``, optional (default = ``None``).
@@ -172,7 +176,7 @@ class Trainer(TrainerBase):
             parameters. This is necessary because we want the saved model to perform as well as the validated
             model if we load it later. But this may cause problems if you restart the training from checkpoint.
         """
-        super().__init__(serialization_dir, cuda_device)
+        super().__init__(serialization_dir, cuda_device, use_tpu)
 
         # I am not calling move_to_gpu here, because if the model is
         # not already on the GPU then the optimizer is going to be wrong.
@@ -253,11 +257,12 @@ class Trainer(TrainerBase):
         If ``for_training`` is `True` also applies regularization penalty.
         """
         if self._multiple_gpu:
-            output_dict = training_util.data_parallel(batch_group, self.model, self._cuda_devices)
+            output_dict = training_util.data_parallel(batch_group, self.model, self._cuda_devices,
+                                                    use_tpu=self._use_tpu)
         else:
             assert len(batch_group) == 1
             batch = batch_group[0]
-            batch = nn_util.move_to_device(batch, self._cuda_devices[0])
+            batch = nn_util.move_to_device(batch, self._cuda_devices[0], use_tpu=self._use_tpu)
             output_dict = self.model(**batch)
 
         try:
@@ -670,6 +675,7 @@ class Trainer(TrainerBase):
         shuffle = params.pop_bool("shuffle", True)
         num_epochs = params.pop_int("num_epochs", 20)
         cuda_device = parse_cuda_device(params.pop("cuda_device", -1))
+        use_tpu = params.pop_bool("use_tpu", False)
         grad_norm = params.pop_float("grad_norm", None)
         grad_clipping = params.pop_float("grad_clipping", None)
         lr_scheduler_params = params.pop("learning_rate_scheduler", None)
@@ -680,9 +686,14 @@ class Trainer(TrainerBase):
         else:
             model_device = cuda_device
         if model_device >= 0:
-            # Moving model to GPU here so that the optimizer state gets constructed on
-            # the right device.
-            model = model.cuda(model_device)
+            if use_tpu:
+                import torch_xla.core.xla_model as xm
+                # XLA TPUs are 1-indexed
+                model = model.to(xm.xla_device(n=cuda_device + 1, devkind='TPU'))
+            else:
+                # Moving model to GPU here so that the optimizer state gets constructed on
+                # the right device.
+                model = model.cuda(model_device)
 
         parameters = [[n, p] for n, p in model.named_parameters() if p.requires_grad]
         optimizer = Optimizer.from_params(parameters, params.pop("optimizer"))
@@ -733,6 +744,7 @@ class Trainer(TrainerBase):
                    num_epochs=num_epochs,
                    serialization_dir=serialization_dir,
                    cuda_device=cuda_device,
+                   use_tpu=use_tpu,
                    grad_norm=grad_norm,
                    grad_clipping=grad_clipping,
                    learning_rate_scheduler=lr_scheduler,

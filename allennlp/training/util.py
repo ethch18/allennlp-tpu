@@ -13,7 +13,7 @@ import torch
 from torch.nn.parallel import replicate, parallel_apply
 from torch.nn.parallel.scatter_gather import gather
 
-from allennlp.common.checks import ConfigurationError, check_for_gpu
+from allennlp.common.checks import ConfigurationError, check_for_gpu, check_for_tpu
 from allennlp.common.params import Params
 from allennlp.common.tqdm import Tqdm
 from allennlp.data.dataset_readers import DatasetReader
@@ -86,11 +86,11 @@ def move_optimizer_to_cuda(optimizer):
     """
     for param_group in optimizer.param_groups:
         for param in param_group['params']:
-            if param.is_cuda:
+            if param.device != 'cpu':
                 param_state = optimizer.state[param]
                 for k in param_state.keys():
                     if isinstance(param_state[k], torch.Tensor):
-                        param_state[k] = param_state[k].cuda(device=param.get_device())
+                        param_state[k] = param_state[k].to(device=param.get_device())
 
 
 def get_batch_size(batch: Union[Dict, torch.Tensor]) -> int:
@@ -309,7 +309,8 @@ def create_serialization_dir(
 
 def data_parallel(batch_group: List[TensorDict],
                   model: Model,
-                  cuda_devices: List) -> Dict[str, torch.Tensor]:
+                  cuda_devices: List,
+                  use_tpu: bool = False) -> Dict[str, torch.Tensor]:
     """
     Performs a forward pass using multiple GPUs.  This is a simplification
     of torch.nn.parallel.data_parallel to support the allennlp model
@@ -317,7 +318,7 @@ def data_parallel(batch_group: List[TensorDict],
     """
     assert len(batch_group) <= len(cuda_devices)
 
-    moved = [nn_util.move_to_device(batch, device)
+    moved = [nn_util.move_to_device(batch, device, use_tpu=use_tpu)
              for batch, device in zip(batch_group, cuda_devices)]
 
     used_device_ids = cuda_devices[:len(moved)]
@@ -368,8 +369,12 @@ def evaluate(model: Model,
              instances: Iterable[Instance],
              data_iterator: DataIterator,
              cuda_device: int,
-             batch_weight_key: str) -> Dict[str, Any]:
-    check_for_gpu(cuda_device)
+             batch_weight_key: str,
+             use_tpu: bool = False) -> Dict[str, Any]:
+    if use_tpu:
+        check_for_tpu(cuda_device)
+    else:
+        check_for_gpu(cuda_device)
     with torch.no_grad():
         model.eval()
 
@@ -390,7 +395,7 @@ def evaluate(model: Model,
 
         for batch in generator_tqdm:
             batch_count += 1
-            batch = nn_util.move_to_device(batch, cuda_device)
+            batch = nn_util.move_to_device(batch, cuda_device, use_tpu=use_tpu)
             output_dict = model(**batch)
             loss = output_dict.get("loss")
 

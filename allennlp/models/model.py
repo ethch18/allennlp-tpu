@@ -241,7 +241,8 @@ class Model(torch.nn.Module, Registrable):
               config: Params,
               serialization_dir: str,
               weights_file: str = None,
-              cuda_device: int = -1) -> 'Model':
+              cuda_device: int = -1,
+              use_tpu: bool = False) -> 'Model':
         """
         Instantiates an already-trained model, based on the experiment
         configuration and some optional overrides.
@@ -272,13 +273,18 @@ class Model(torch.nn.Module, Registrable):
         # If vocab and model embeddings are in sync, following would be just a no-op.
         model.extend_embedder_vocab()
 
-        model_state = torch.load(weights_file, map_location=util.device_mapping(cuda_device))
+        model_state = torch.load(weights_file, map_location=util.device_mapping(cuda_device, use_tpu=use_tpu))
         model.load_state_dict(model_state)
 
         # Force model to cpu or gpu, as appropriate, to make sure that the embeddings are
         # in sync with the weights
         if cuda_device >= 0:
-            model.cuda(cuda_device)
+            if use_tpu:
+                import torch_xla.core.xla_model as xm
+                # XLA TPUs are 1-indexed
+                model.to(xm.xla_device(n=cuda_device + 1, devkind='TPU'))
+            else:
+                model.cuda(cuda_device)
         else:
             model.cpu()
 
@@ -289,7 +295,8 @@ class Model(torch.nn.Module, Registrable):
              config: Params,
              serialization_dir: str,
              weights_file: str = None,
-             cuda_device: int = -1) -> 'Model':
+             cuda_device: int = -1,
+             use_tpu: bool = False) -> 'Model':
         """
         Instantiates an already-trained model, based on the experiment
         configuration and some optional overrides.
@@ -309,6 +316,8 @@ class Model(torch.nn.Module, Registrable):
         cuda_device: int = -1
             By default we load the model on the CPU, but if you want to load it
             for GPU usage you can specify the id of your GPU here
+        use_tpu: bool = False
+            Whether to use TPU
 
 
         Returns
@@ -324,7 +333,7 @@ class Model(torch.nn.Module, Registrable):
         # Load using an overridable _load method.
         # This allows subclasses of Model to override _load.
         # pylint: disable=protected-access
-        return cls.by_name(model_type)._load(config, serialization_dir, weights_file, cuda_device)
+        return cls.by_name(model_type)._load(config, serialization_dir, weights_file, cuda_device, use_tpu)
 
     def extend_embedder_vocab(self, embedding_sources_mapping: Dict[str, str] = None) -> None:
         """

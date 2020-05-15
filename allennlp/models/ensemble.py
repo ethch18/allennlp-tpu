@@ -35,7 +35,8 @@ class Ensemble(Model):
               config: Params,
               serialization_dir: str,
               weights_file: str = None,
-              cuda_device: int = -1) -> 'Model':
+              cuda_device: int = -1,
+              use_tpu: bool = False) -> 'Model':
         """
         Ensembles don't have vocabularies or weights of their own, so they override _load.
         """
@@ -51,7 +52,12 @@ class Ensemble(Model):
         # Force model to cpu or gpu, as appropriate, to make sure that the embeddings are
         # in sync with the weights
         if cuda_device >= 0:
-            model.cuda(cuda_device)
+            if use_tpu:
+                import torch_xla.core.xla_model as xm
+                # XLA TPUs are 1-indexed
+                model.to(xm.xla_device(n=cuda_device + 1, devkind='TPU'))
+            else:
+                model.cuda(cuda_device)
         else:
             model.cpu()
 

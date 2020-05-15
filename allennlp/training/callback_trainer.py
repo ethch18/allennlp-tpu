@@ -52,6 +52,7 @@ class CallbackTrainer(TrainerBase):
                  shuffle: bool = True,
                  serialization_dir: Optional[str] = None,
                  cuda_device: Union[int, List] = -1,
+                 use_tpu: bool = False,
                  callbacks: List[Callback] = None) -> None:
         """
         A trainer for doing supervised learning. It just takes a labeled dataset
@@ -89,11 +90,13 @@ class CallbackTrainer(TrainerBase):
             Path to directory for saving and loading model files. Models will not be saved if
             this parameter is not passed.
         cuda_device : ``Union[int, List[int]]``, optional (default=-1)
-            An integer or list of integers specifying the CUDA device(s) to use. If -1, the CPU is used.
+            An integer or list of integers specifying the CUDA device(s) to use.
+            If -1, the CPU is used.
+        use_tpu : ``bool``, optional (default=False)
         callbacks : ``List[Callback]``, optional (default=None)
             A list of callbacks that will be called based on training events.
         """
-        super().__init__(serialization_dir, cuda_device)
+        super().__init__(serialization_dir, cuda_device, use_tpu=use_tpu)
 
         logger.warning("The CallbackTrainer should be considered 'experimental' code, "
                        "and its behavior may change as we use it more and iterate on it.")
@@ -160,11 +163,12 @@ class CallbackTrainer(TrainerBase):
         (which are handled separately).
         """
         if self._multiple_gpu:
-            output_dict = training_util.data_parallel(batch_group, self.model, self._cuda_devices)
+            output_dict = training_util.data_parallel(batch_group, self.model, self._cuda_devices,
+                                                    use_tpu=self._use_tpu)
         else:
             assert len(batch_group) == 1
             batch = batch_group[0]
-            batch = nn_util.move_to_device(batch, self._cuda_devices[0])
+            batch = nn_util.move_to_device(batch, self._cuda_devices[0], self._use_tpu)
             output_dict = self.model(**batch)
 
         try:
@@ -291,15 +295,21 @@ class CallbackTrainer(TrainerBase):
         shuffle = params.pop_bool("shuffle", True)
         num_epochs = params.pop_int("num_epochs", 20)
         cuda_device = parse_cuda_device(params.pop("cuda_device", -1))
+        use_tpu = params.pop_bool("use_tpu", False)
 
         if isinstance(cuda_device, list):
             model_device = cuda_device[0]
         else:
             model_device = cuda_device
         if model_device >= 0:
-            # Moving model to GPU here so that the optimizer state gets constructed on
-            # the right device.
-            model = model.cuda(model_device)
+            if use_tpu:
+                import torch_xla.core.xla_model as xm
+                # XLA TPUs are 1-indexed
+                model = model.to(xm.xla_device(n=cuda_device + 1, devkind='TPU'))
+            else:
+                # Moving model to GPU here so that the optimizer state gets constructed on
+                # the right device.
+                model = model.cuda(model_device)
 
         parameters = [[n, p] for n, p in model.named_parameters() if p.requires_grad]
         optimizer = Optimizer.from_params(parameters, params.pop("optimizer"))
@@ -325,4 +335,5 @@ class CallbackTrainer(TrainerBase):
                    shuffle=shuffle,
                    serialization_dir=serialization_dir,
                    cuda_device=cuda_device,
+                   use_tpu=use_tpu,
                    callbacks=callbacks)

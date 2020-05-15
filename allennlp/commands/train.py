@@ -39,6 +39,7 @@ which to write the results.
                             computing a hash
       --include-package INCLUDE_PACKAGE
                             additional packages to include
+     --use-tpu              Whether to use TPUs
 """
 
 import argparse
@@ -46,7 +47,7 @@ import logging
 import os
 
 from allennlp.commands.subcommand import Subcommand
-from allennlp.common.checks import check_for_gpu
+from allennlp.common.checks import check_for_gpu, check_for_tpu
 from allennlp.common import Params
 from allennlp.common.util import prepare_environment, prepare_global_logging, cleanup_global_logging, dump_metrics
 from allennlp.models.archival import archive_model, CONFIG_NAME
@@ -105,6 +106,10 @@ class Train(Subcommand):
                                help='Prefix to use for data caching, giving current parameter '
                                'settings a name in the cache, instead of computing a hash')
 
+        subparser.add_argument('--use-tpu',
+                                action='store-true',
+                                help='Whether to use a TPU')
+
         subparser.set_defaults(func=train_model_from_args)
 
         return subparser
@@ -121,7 +126,8 @@ def train_model_from_args(args: argparse.Namespace):
                           args.recover,
                           args.force,
                           args.cache_directory,
-                          args.cache_prefix)
+                          args.cache_prefix,
+                          args.use_tpu)
 
 
 def train_model_from_file(parameter_filename: str,
@@ -131,7 +137,8 @@ def train_model_from_file(parameter_filename: str,
                           recover: bool = False,
                           force: bool = False,
                           cache_directory: str = None,
-                          cache_prefix: str = None) -> Model:
+                          cache_prefix: str = None,
+                          use_tpu: bool = False) -> Model:
     """
     A wrapper around :func:`train_model` which loads the params from a file.
 
@@ -156,7 +163,10 @@ def train_model_from_file(parameter_filename: str,
     cache_directory : ``str``, optional
         For caching data pre-processing.  See :func:`allennlp.training.util.datasets_from_params`.
     cache_prefix : ``str``, optional
-        For caching data pre-processing.  See :func:`allennlp.training.util.datasets_from_params`.
+        For caching data pre-processing.  See
+        :func:`allennlp.training.util.datasets_from_params`.
+    use_tpu : ``bool``, optional (default=False)
+        If ``True``, use a TPU during training.
     """
     # Load the experiment config from a file and pass it to ``train_model``.
     params = Params.from_file(parameter_filename, overrides)
@@ -165,7 +175,9 @@ def train_model_from_file(parameter_filename: str,
                        file_friendly_logging,
                        recover,
                        force,
-                       cache_directory, cache_prefix)
+                       cache_directory,
+                       cache_prefix,
+                       use_tpu)
 
 
 def train_model(params: Params,
@@ -174,7 +186,8 @@ def train_model(params: Params,
                 recover: bool = False,
                 force: bool = False,
                 cache_directory: str = None,
-                cache_prefix: str = None) -> Model:
+                cache_prefix: str = None,
+                use_tpu: bool = False) -> Model:
     """
     Trains the model specified in the given :class:`Params` object, using the data and training
     parameters also specified in that object, and saves the results in ``serialization_dir``.
@@ -198,6 +211,8 @@ def train_model(params: Params,
         For caching data pre-processing.  See :func:`allennlp.training.util.datasets_from_params`.
     cache_prefix : ``str``, optional
         For caching data pre-processing.  See :func:`allennlp.training.util.datasets_from_params`.
+    use_tpu : ``bool``, optional (default=False)
+        If ``True``, use a TPU during training.
 
     Returns
     -------
@@ -209,7 +224,10 @@ def train_model(params: Params,
     prepare_environment(params)
 
     cuda_device = params.params.get('trainer').get('cuda_device', -1)
-    check_for_gpu(cuda_device)
+    if use_tpu:
+        check_for_tpu(cuda_device)
+    else:
+        check_for_gpu(cuda_device)
 
     params.to_file(os.path.join(serialization_dir, CONFIG_NAME))
 
@@ -231,7 +249,8 @@ def train_model(params: Params,
                 train_data=pieces.train_dataset,
                 validation_data=pieces.validation_dataset,
                 params=pieces.params,
-                validation_iterator=pieces.validation_iterator)
+                validation_iterator=pieces.validation_iterator,
+                use_tpu=use_tpu)
 
         evaluation_iterator = pieces.validation_iterator or pieces.iterator
         evaluation_dataset = pieces.test_dataset
@@ -243,7 +262,7 @@ def train_model(params: Params,
                              "to evaluate at Events.TRAINING_END; otherwise you'll have "
                              "to run allennlp evaluate separately.")
 
-        trainer = TrainerBase.from_params(params, serialization_dir, recover, cache_directory, cache_prefix)
+        trainer = TrainerBase.from_params(params, serialization_dir, recover, cache_directory, cache_prefix, use_tpu=use_tpu)
         evaluation_dataset = None
 
     params.assert_empty('base train command')
@@ -264,7 +283,8 @@ def train_model(params: Params,
         test_metrics = evaluate(trainer.model, evaluation_dataset, evaluation_iterator,
                                 cuda_device=trainer._cuda_devices[0],  # pylint: disable=protected-access,
                                 # TODO(brendanr): Pass in an arg following Joel's trainer refactor.
-                                batch_weight_key="")
+                                batch_weight_key="",
+                                use_tpu=use_tpu)
 
         for key, value in test_metrics.items():
             metrics["test_" + key] = value

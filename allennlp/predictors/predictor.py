@@ -228,7 +228,7 @@ class Predictor(Registrable):
 
     @classmethod
     def from_path(cls, archive_path: str, predictor_name: str = None, cuda_device: int = -1,
-                  dataset_reader_to_load: str = "validation") -> 'Predictor':
+                  dataset_reader_to_load: str = "validation", use_tpu: bool = False) -> 'Predictor':
         """
         Instantiate a :class:`Predictor` from an archive path.
 
@@ -248,12 +248,14 @@ class Predictor(Registrable):
         dataset_reader_to_load: ``str``, optional (default="validation")
             Which dataset reader to load from the archive, either "train" or
             "validation".
+        use_tpu: ``bool``, optional (default=False)
+            Whether to use TPU
 
         Returns
         -------
         A Predictor instance.
         """
-        return Predictor.from_archive(load_archive(archive_path, cuda_device=cuda_device), predictor_name,
+        return Predictor.from_archive(load_archive(archive_path, cuda_device=cuda_device, use_tpu=use_tpu), predictor_name,
                                       dataset_reader_to_load=dataset_reader_to_load)
 
     @classmethod

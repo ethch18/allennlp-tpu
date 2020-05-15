@@ -11,6 +11,7 @@ import json
 import numpy
 
 import torch
+import torch_xla.core.xla_model as xm
 
 from allennlp.common.checks import ConfigurationError
 
@@ -34,7 +35,7 @@ def has_tensor(obj) -> bool:
         return False
 
 
-def move_to_device(obj, cuda_device: int):
+def move_to_device(obj, cuda_device: int, use_tpu: bool = False):
     """
     Given a structure (possibly) containing Tensors on the CPU,
     move all the Tensors to the specified GPU (or do nothing, if they should be on the CPU).
@@ -43,16 +44,20 @@ def move_to_device(obj, cuda_device: int):
     if cuda_device < 0 or not has_tensor(obj):
         return obj
     elif isinstance(obj, torch.Tensor):
-        return obj.cuda(cuda_device)
+        if use_tpu:
+            # XLA TPUs are 1-indexed
+            return obj.to(xm.xla_device(n=cuda_device + 1, devkind='TPU'))
+        else:
+            return obj.cuda(cuda_device)
     elif isinstance(obj, dict):
-        return {key: move_to_device(value, cuda_device) for key, value in obj.items()}
+        return {key: move_to_device(value, cuda_device, use_tpu) for key, value in obj.items()}
     elif isinstance(obj, list):
-        return [move_to_device(item, cuda_device) for item in obj]
+        return [move_to_device(item, cuda_device, use_tpu) for item in obj]
     elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
         # This is the best way to detect a NamedTuple, it turns out.
-        return obj.__class__(*[move_to_device(item, cuda_device) for item in obj])
+        return obj.__class__(*[move_to_device(item, cuda_device, use_tpu) for item in obj])
     elif isinstance(obj, tuple):
-        return tuple([move_to_device(item, cuda_device) for item in obj])
+        return tuple([move_to_device(item, cuda_device, use_tpu) for item in obj])
     else:
         return obj
 
@@ -816,7 +821,7 @@ def tensors_equal(tensor1: torch.Tensor, tensor2: torch.Tensor, tolerance: float
             raise
 
 
-def device_mapping(cuda_device: int):
+def device_mapping(cuda_device: int, use_tpu: bool = False):
     """
     In order to `torch.load()` a GPU-trained model onto a CPU (or specific GPU),
     you have to supply a `map_location` function. Call this with
@@ -825,7 +830,10 @@ def device_mapping(cuda_device: int):
 
     def inner_device_mapping(storage: torch.Storage, location) -> torch.Storage:  # pylint: disable=unused-argument
         if cuda_device >= 0:
-            return storage.cuda(cuda_device)
+            if use_tpu:
+                return storage.to(xm.xla_device(n=cuda_device + 1, devkind='TPU'))
+            else:
+                return storage.cuda(cuda_device)
         else:
             return storage
 
@@ -1062,8 +1070,10 @@ def get_device_of(tensor: torch.Tensor) -> int:
     """
     Returns the device of the tensor.
     """
-    if not tensor.is_cuda:
+    if tensor.device == 'cpu':
         return -1
+    elif tensor.device[:3] == 'tpu':
+        return tensor.device
     else:
         return tensor.get_device()
 

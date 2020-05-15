@@ -48,6 +48,7 @@ or dataset to JSON predictions using a trained model and its
                             optionally specify a specific predictor to use
       --include-package INCLUDE_PACKAGE
                             additional packages to include
+      --use-tpu             Whether to use TPUs
 """
 from typing import List, Iterator, Optional
 import argparse
@@ -55,7 +56,7 @@ import sys
 import json
 
 from allennlp.commands.subcommand import Subcommand
-from allennlp.common.checks import check_for_gpu, ConfigurationError
+from allennlp.common.checks import check_for_gpu, check_for_tpu, ConfigurationError
 from allennlp.common.file_utils import cached_path
 from allennlp.common.util import lazy_groups_of
 from allennlp.models.archival import load_archive
@@ -107,17 +108,25 @@ class Predict(Subcommand):
         subparser.add_argument('--predictor',
                                type=str,
                                help='optionally specify a specific predictor to use')
+                               
+        subparser.add_argument('--use-tpu',
+                                action='store_true',
+                                help='Whether to use a TPU')
 
         subparser.set_defaults(func=_predict)
 
         return subparser
 
 def _get_predictor(args: argparse.Namespace) -> Predictor:
-    check_for_gpu(args.cuda_device)
+    if args.use_tpu:
+        check_for_tpu(args.cuda_device)
+    else:
+        check_for_gpu(args.cuda_device)
     archive = load_archive(args.archive_file,
                            weights_file=args.weights_file,
                            cuda_device=args.cuda_device,
-                           overrides=args.overrides)
+                           overrides=args.overrides,
+                           use_tpu=args.use_tpu)
 
     return Predictor.from_archive(archive, args.predictor,
                                   dataset_reader_to_load=args.dataset_reader_choice)

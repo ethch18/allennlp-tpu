@@ -16,7 +16,7 @@ class NoOpTrainer(TrainerBase):
         require training. For instance, a majority class baseline.
         """
 
-        super().__init__(serialization_dir, cuda_device=-1)
+        super().__init__(serialization_dir, cuda_device=-1, use_tpu=False)
         self.model = model
 
     @classmethod

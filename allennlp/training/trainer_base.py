@@ -12,7 +12,7 @@ import logging
 from typing import Dict, List, Union, Any
 
 from allennlp.common import Params, Registrable
-from allennlp.common.checks import ConfigurationError, check_for_gpu
+from allennlp.common.checks import ConfigurationError, check_for_gpu, check_for_tpu
 from allennlp.models.model import Model
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,14 @@ class TrainerBase(Registrable):
 
     def __init__(self,
                  serialization_dir: str,
-                 cuda_device: Union[int, List] = -1) -> None:
-        check_for_gpu(cuda_device)
+                 cuda_device: Union[int, List] = -1,
+                 use_tpu: bool = False) -> None:
+        if use_tpu:
+            check_for_tpu(cuda_device)
+        else:
+            check_for_gpu(cuda_device)
+
+        self._use_tpu = use_tpu
 
         self._serialization_dir = serialization_dir
 
@@ -46,7 +52,12 @@ class TrainerBase(Registrable):
 
     def _move_to_gpu(self, model: Model) -> Model:
         if self._cuda_devices[0] != -1:
-            return model.cuda(self._cuda_devices[0])
+            if self._use_tpu:
+                import torch_xla.core.xla_model as xm
+                # XLA TPUs are 1-indexed
+                return model.to(xm.xla_device(n=cuda_device + 1, devkind='TPU'))
+            else:
+                return model.cuda(self._cuda_devices[0])
         else:
             return model
 

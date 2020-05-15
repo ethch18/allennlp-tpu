@@ -150,7 +150,8 @@ def archive_model(serialization_dir: str,
 def load_archive(archive_file: str,
                  cuda_device: int = -1,
                  overrides: str = "",
-                 weights_file: str = None) -> Archive:
+                 weights_file: str = None,
+                 use_tpu: bool = False) -> Archive:
     """
     Instantiates an Archive from an archived `tar.gz` file.
 
@@ -165,6 +166,8 @@ def load_archive(archive_file: str,
         corresponding GPU. Otherwise it will be loaded onto the CPU.
     overrides: ``str``, optional (default = "")
         JSON overrides to apply to the unarchived ``Params`` object.
+    use_tpu: ``bool``, optional (default = False)
+        Whether to use TPu
     """
     # redirect to the cache, if necessary
     resolved_archive_file = cached_path(archive_file)
@@ -227,7 +230,8 @@ def load_archive(archive_file: str,
     model = Model.load(config.duplicate(),
                        weights_file=weights_path,
                        serialization_dir=serialization_dir,
-                       cuda_device=cuda_device)
+                       cuda_device=cuda_device,
+                       use_tpu=use_tpu)
 
     return Archive(model=model, config=config)
 

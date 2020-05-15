@@ -48,6 +48,7 @@ and report any metrics calculated by the model.
                             vectors for embedding extension.
       --include-package INCLUDE_PACKAGE
                             additional packages to include
+      --use-tpu             Whether to use TPUs
 """
 from typing import Dict, Any
 import argparse
@@ -115,6 +116,10 @@ class Evaluate(Subcommand):
                                'extended, we will try to use the original file paths used during training. If '
                                'they are not available we will use random vectors for embedding extension.')
 
+        subparser.add_argument('--use-tpu',
+                                action='store_true',
+                                help='Whether to use a TPU')
+
         subparser.set_defaults(func=evaluate_from_args)
 
         return subparser
@@ -126,7 +131,7 @@ def evaluate_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     logging.getLogger('allennlp.modules.token_embedders.embedding').setLevel(logging.INFO)
 
     # Load from archive
-    archive = load_archive(args.archive_file, args.cuda_device, args.overrides, args.weights_file)
+    archive = load_archive(args.archive_file, args.cuda_device, args.overrides, args.weights_file, use_tpu=args.use_tpu)
     config = archive.config
     prepare_environment(config)
     model = archive.model
@@ -158,7 +163,7 @@ def evaluate_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     iterator = DataIterator.from_params(iterator_params)
     iterator.index_with(model.vocab)
 
-    metrics = evaluate(model, instances, iterator, args.cuda_device, args.batch_weight_key)
+    metrics = evaluate(model, instances, iterator, args.cuda_device, args.batch_weight_key, use_tpu=args.use_tpu)
 
     logger.info("Finished evaluating.")
     logger.info("Metrics:")
