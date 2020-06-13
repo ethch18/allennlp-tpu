@@ -107,7 +107,7 @@ class Train(Subcommand):
                                'settings a name in the cache, instead of computing a hash')
 
         subparser.add_argument('--use-tpu',
-                                action='store-true',
+                                action='store_true',
                                 help='Whether to use a TPU')
 
         subparser.set_defaults(func=train_model_from_args)
