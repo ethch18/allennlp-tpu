@@ -316,6 +316,7 @@ class Trainer(TrainerBase):
                                          total=num_training_batches)
         cumulative_batch_size = 0
         for batch_group in train_generator_tqdm:
+            import pdb; pdb.set_trace()
             batches_this_epoch += 1
             self._batch_num_total += 1
             batch_num_total = self._batch_num_total
