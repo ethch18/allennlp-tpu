@@ -263,6 +263,7 @@ class Trainer(TrainerBase):
             assert len(batch_group) == 1
             batch = batch_group[0]
             batch = nn_util.move_to_device(batch, self._cuda_devices[0], use_tpu=self._use_tpu)
+            import pdb; pdb.set_trace()
             output_dict = self.model(**batch)
 
         try:
@@ -316,7 +317,6 @@ class Trainer(TrainerBase):
                                          total=num_training_batches)
         cumulative_batch_size = 0
         for batch_group in train_generator_tqdm:
-            import pdb; pdb.set_trace()
             batches_this_epoch += 1
             self._batch_num_total += 1
             batch_num_total = self._batch_num_total
