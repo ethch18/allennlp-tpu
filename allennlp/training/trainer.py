@@ -263,7 +263,6 @@ class Trainer(TrainerBase):
             assert len(batch_group) == 1
             batch = batch_group[0]
             batch = nn_util.move_to_device(batch, self._cuda_devices[0], use_tpu=self._use_tpu)
-            import pdb; pdb.set_trace()
             output_dict = self.model(**batch)
 
         try:
