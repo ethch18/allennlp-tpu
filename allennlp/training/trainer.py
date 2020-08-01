@@ -668,14 +668,14 @@ class Trainer(TrainerBase):
                     train_data: Iterable[Instance],
                     validation_data: Optional[Iterable[Instance]],
                     params: Params,
-                    validation_iterator: DataIterator = None) -> 'Trainer':
+                    validation_iterator: DataIterator = None,
+                    use_tpu: bool = False) -> 'Trainer':
         # pylint: disable=arguments-differ
         patience = params.pop_int("patience", None)
         validation_metric = params.pop("validation_metric", "-loss")
         shuffle = params.pop_bool("shuffle", True)
         num_epochs = params.pop_int("num_epochs", 20)
         cuda_device = parse_cuda_device(params.pop("cuda_device", -1))
-        use_tpu = params.pop_bool("use_tpu", False)
         grad_norm = params.pop_float("grad_norm", None)
         grad_clipping = params.pop_float("grad_clipping", None)
         lr_scheduler_params = params.pop("learning_rate_scheduler", None)
