@@ -170,6 +170,7 @@ def sort_batch_by_length(tensor: torch.Tensor, sequence_lengths: torch.Tensor):
         raise ConfigurationError("Both the tensor and sequence lengths must be torch.Tensors.")
 
     sorted_sequence_lengths, permutation_index = sequence_lengths.sort(0, descending=True)
+    import pdb; pdb.set_trace()
     sorted_tensor = tensor.index_select(0, permutation_index)
 
     index_range = torch.arange(0, len(sequence_lengths), device=sequence_lengths.device)
