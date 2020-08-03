@@ -169,8 +169,10 @@ def sort_batch_by_length(tensor: torch.Tensor, sequence_lengths: torch.Tensor):
     if not isinstance(tensor, torch.Tensor) or not isinstance(sequence_lengths, torch.Tensor):
         raise ConfigurationError("Both the tensor and sequence lengths must be torch.Tensors.")
 
-    sorted_sequence_lengths, permutation_index = sequence_lengths.sort(0, descending=True)
+    # cast to int for XLA compat
     import pdb; pdb.set_trace()
+    sequence_lengths = sequence_lengths.int()
+    sorted_sequence_lengths, permutation_index = sequence_lengths.sort(0, descending=True)
     sorted_tensor = tensor.index_select(0, permutation_index)
 
     index_range = torch.arange(0, len(sequence_lengths), device=sequence_lengths.device)
@@ -575,7 +577,6 @@ def get_text_field_mask(text_field_tensors: Dict[str, torch.Tensor],
     >>> var_mask = torch.autograd.V(mask)
     >>> var_mask.sum() # equals 4, due to 8 bit precision - the sum overflows.
     """
-    import pdb; pdb.set_trace()
     if "mask" in text_field_tensors:
         return text_field_tensors["mask"]
 
