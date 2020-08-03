@@ -575,6 +575,7 @@ def get_text_field_mask(text_field_tensors: Dict[str, torch.Tensor],
     >>> var_mask = torch.autograd.V(mask)
     >>> var_mask.sum() # equals 4, due to 8 bit precision - the sum overflows.
     """
+    import pdb; pdb.set_trace()
     if "mask" in text_field_tensors:
         return text_field_tensors["mask"]
 
