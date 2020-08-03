@@ -170,7 +170,7 @@ def sort_batch_by_length(tensor: torch.Tensor, sequence_lengths: torch.Tensor):
         raise ConfigurationError("Both the tensor and sequence lengths must be torch.Tensors.")
 
     # cast to int for XLA compat
-    import pdb; pdb.set_trace()
+    # TODO: clean up
     sequence_lengths = sequence_lengths.int()
     sorted_sequence_lengths, permutation_index = sequence_lengths.sort(0, descending=True)
     permutation_index = permutation_index.int()
