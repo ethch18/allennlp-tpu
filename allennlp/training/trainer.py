@@ -689,7 +689,7 @@ class Trainer(TrainerBase):
             if use_tpu:
                 import torch_xla.core.xla_model as xm
                 # XLA TPUs are 1-indexed
-                model = model.to(xm.xla_device(n=cuda_device + 1, devkind='TPU'))
+                model = model.to(xm.xla_device(n=model_device + 1, devkind='TPU'))
             else:
                 # Moving model to GPU here so that the optimizer state gets constructed on
                 # the right device.
