@@ -173,12 +173,14 @@ def sort_batch_by_length(tensor: torch.Tensor, sequence_lengths: torch.Tensor):
     import pdb; pdb.set_trace()
     sequence_lengths = sequence_lengths.int()
     sorted_sequence_lengths, permutation_index = sequence_lengths.sort(0, descending=True)
+    permutation_index = permutation_index.int()
     sorted_tensor = tensor.index_select(0, permutation_index)
 
     index_range = torch.arange(0, len(sequence_lengths), device=sequence_lengths.device)
     # This is the equivalent of zipping with index, sorting by the original
     # sequence lengths and returning the now sorted indices.
     _, reverse_mapping = permutation_index.sort(0, descending=False)
+    reverse_mapping = reverse_mapping.int()
     restoration_indices = index_range.index_select(0, reverse_mapping)
     return sorted_tensor, sorted_sequence_lengths, restoration_indices, permutation_index
 
