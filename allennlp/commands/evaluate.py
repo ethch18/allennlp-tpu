@@ -24,20 +24,30 @@ logger = logging.getLogger(__name__)
 @Subcommand.register("evaluate")
 class Evaluate(Subcommand):
     @overrides
-    def add_subparser(self, parser: argparse._SubParsersAction) -> argparse.ArgumentParser:
+    def add_subparser(
+        self, parser: argparse._SubParsersAction
+    ) -> argparse.ArgumentParser:
         description = """Evaluate the specified model + dataset"""
         subparser = parser.add_parser(
-            self.name, description=description, help="Evaluate the specified model + dataset."
-        )
-
-        subparser.add_argument("archive_file", type=str, help="path to an archived trained model")
-
-        subparser.add_argument(
-            "input_file", type=str, help="path to the file containing the evaluation data"
+            self.name,
+            description=description,
+            help="Evaluate the specified model + dataset.",
         )
 
         subparser.add_argument(
-            "--output-file", type=str, help="optional path to write the metrics to as JSON"
+            "archive_file", type=str, help="path to an archived trained model"
+        )
+
+        subparser.add_argument(
+            "input_file",
+            type=str,
+            help="path to the file containing the evaluation data",
+        )
+
+        subparser.add_argument(
+            "--output-file",
+            type=str,
+            help="optional path to write the metrics to as JSON",
         )
 
         subparser.add_argument(
@@ -47,12 +57,17 @@ class Evaluate(Subcommand):
         )
 
         subparser.add_argument(
-            "--weights-file", type=str, help="a path that overrides which weights file to use"
+            "--weights-file",
+            type=str,
+            help="a path that overrides which weights file to use",
         )
 
         cuda_device = subparser.add_mutually_exclusive_group(required=False)
         cuda_device.add_argument(
-            "--cuda-device", type=int, default=-1, help="id of GPU to use (if any)"
+            "--cuda-device",
+            type=int,
+            default=-1,
+            help="id of GPU to use (if any)",
         )
 
         subparser.add_argument(
@@ -68,7 +83,9 @@ class Evaluate(Subcommand):
         )
 
         subparser.add_argument(
-            "--batch-size", type=int, help="If non-empty, the batch size to use during evaluation."
+            "--batch-size",
+            type=int,
+            help="If non-empty, the batch size to use during evaluation.",
         )
 
         subparser.add_argument(
@@ -103,6 +120,14 @@ class Evaluate(Subcommand):
             help="outputs tqdm status on separate lines and slows tqdm refresh rate",
         )
 
+        subparser.add_argument(
+            "--extend-namespace",
+            type=str,
+            action="append",
+            default=[],
+            help="Vocabulary namespaces to extend",
+        )
+
         subparser.set_defaults(func=evaluate_from_args)
 
         return subparser
@@ -114,7 +139,9 @@ def evaluate_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     # Disable some of the more verbose logging statements
     logging.getLogger("allennlp.common.params").disabled = True
     logging.getLogger("allennlp.nn.initializers").disabled = True
-    logging.getLogger("allennlp.modules.token_embedders.embedding").setLevel(logging.INFO)
+    logging.getLogger("allennlp.modules.token_embedders.embedding").setLevel(
+        logging.INFO
+    )
 
     # Load from archive
     archive = load_archive(
@@ -141,17 +168,28 @@ def evaluate_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     if args.batch_size:
         data_loader_params["batch_size"] = args.batch_size
     data_loader = DataLoader.from_params(
-        params=data_loader_params, reader=dataset_reader, data_path=evaluation_data_path
+        params=data_loader_params,
+        reader=dataset_reader,
+        data_path=evaluation_data_path,
     )
 
     embedding_sources = (
-        json.loads(args.embedding_sources_mapping) if args.embedding_sources_mapping else {}
+        json.loads(args.embedding_sources_mapping)
+        if args.embedding_sources_mapping
+        else {}
     )
 
     if args.extend_vocab:
         logger.info("Vocabulary is being extended with test instances.")
-        model.vocab.extend_from_instances(instances=data_loader.iter_instances())
+        model.vocab.extend_from_instances(
+            instances=data_loader.iter_instances()
+        )
         model.extend_embedder_vocab(embedding_sources)
+
+    if len(args.extend_namespace) > 0:
+        model.vocab.extend_namespaces_from_instances(
+            args.extend_namespace, instances=data_loader.iter_instances()
+        )
 
     data_loader.index_with(model.vocab)
 
