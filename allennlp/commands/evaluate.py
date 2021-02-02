@@ -103,6 +103,14 @@ class Evaluate(Subcommand):
             help="outputs tqdm status on separate lines and slows tqdm refresh rate",
         )
 
+        subparser.add_argument(
+            "--extend-namespace",
+            type=str,
+            action="append",
+            default=[],
+            help="Vocabulary namespaces to extend",
+        )
+
         subparser.set_defaults(func=evaluate_from_args)
 
         return subparser
@@ -144,6 +152,9 @@ def evaluate_from_args(args: argparse.Namespace) -> Dict[str, Any]:
         logger.info("Vocabulary is being extended with test instances.")
         model.vocab.extend_from_instances(instances=instances)
         model.extend_embedder_vocab(embedding_sources)
+
+    if len(args.extend_namespace) > 0:
+        model.vocab.extend_namespaces_from_instances(args.extend_namespace, instances)
 
     instances.index_with(model.vocab)
     data_loader_params = config.pop("validation_data_loader", None)
