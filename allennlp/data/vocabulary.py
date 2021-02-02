@@ -517,6 +517,39 @@ class Vocabulary(Registrable):
             instance.count_vocab_items(namespace_token_counts)
         self._extend(counter=namespace_token_counts)
 
+    def extend_namespaces_from_instances(
+        self, 
+        namespaces: List[str],
+        instances: Iterable["adi.Instance"] = ()
+    ) -> None:
+        """
+        Adapted from `extend_from_instances` via
+        https://github.com/ethch18/parsing-mbert/blob/master/diffs/allennlp.txt
+        """
+        logger.info(f"Updating token dictionary for namespaces: {namespaces}")
+        namespace_token_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        for instance in Tqdm.tqdm(instances):
+            instance.count_vocab_items(namespace_token_counts)
+        self._extend_namespaces(namespaces=namespaces, counter=namespace_token_counts)
+
+    def _extend_namespaces(
+        self,
+        namespaces: List[str] = [],
+        counter: Dict[str, Dict[str, int]] = None
+    ) -> None:
+        """
+        Adapted from `_extend` and `add_token_to_namespace`
+        https://github.com/ethch18/parsing-mbert/blob/master/diffs/allennlp.txt
+        """
+        for namespace in namespaces:
+            if namespace in counter:
+                token_counts = list(counter[namespace].items())
+                token_counts.sort(key=lambda x: x[1], reverse=True)
+                for token, _count in token_counts:
+                    if token not in self._token_to_index[namespace]:
+                        logger.info(f"Added token {token} to namespace {namespace}")
+                        self.add_token_to_namespace(token, namespace)
+
     def extend_from_vocab(self, vocab: "Vocabulary") -> None:
         """
         Adds all vocabulary items from all namespaces in the given vocabulary to this vocabulary.
