@@ -128,6 +128,14 @@ class Evaluate(Subcommand):
             help="Vocabulary namespaces to extend",
         )
 
+        subparser.add_argument(
+            "--data-key",
+            type=str,
+            default=None,
+            help="if this is a multitask model, the key name of the model head "
+            "corresponding to this dataset.",
+        )
+
         subparser.set_defaults(func=evaluate_from_args)
 
         return subparser
@@ -159,7 +167,10 @@ def evaluate_from_args(args: argparse.Namespace) -> Dict[str, Any]:
 
     dataset_reader = archive.validation_dataset_reader
 
-    evaluation_data_path = args.input_file
+    if args.data_key is not None:
+        evaluation_data_path = {args.data_key: args.input_file}
+    else:
+        evaluation_data_path = args.input_file
     logger.info("Reading evaluation data from %s", evaluation_data_path)
 
     data_loader_params = config.pop("validation_data_loader", None)
