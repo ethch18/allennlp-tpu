@@ -1,5 +1,6 @@
 from collections import defaultdict
 import inspect
+import logging
 from typing import Any, Dict, List, Set, Union, Mapping
 
 from overrides import overrides
@@ -10,6 +11,9 @@ from allennlp.modules import Backbone
 from allennlp.models.model import Model
 from allennlp.models.heads import Head
 from allennlp.nn import InitializerApplicator
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_forward_arguments(module: torch.nn.Module) -> Set[str]:
@@ -193,7 +197,12 @@ class MultiTaskModel(Model):
             for key, value in output_dict.items():
                 if key.startswith(head_name):
                     head_outputs[key.replace(f"{head_name}_", "")] = value
-            readable_head_outputs = head.make_output_human_readable(head_outputs)
+            try:
+                readable_head_outputs = head.make_output_human_readable(head_outputs)
+            except KeyError as e:
+                logger.warn(f"Error encountered for head {head_name}")
+                logger.warn(f"\t{str(e)}")
+                readable_head_outputs = {}
             for key, value in readable_head_outputs.items():
                 output_dict[f"{head_name}_{key}"] = value
         return output_dict
