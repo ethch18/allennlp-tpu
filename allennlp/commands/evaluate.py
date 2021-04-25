@@ -138,7 +138,6 @@ class Evaluate(Subcommand):
 
         subparser.add_argument(
             "--truly-multitask",
-            type=bool,
             action="store_true",
             help="Whether this model is truly multitask, meaning that we should "
             "interpret input_file as a JSON string mapping the different data "
