@@ -136,6 +136,15 @@ class Evaluate(Subcommand):
             "corresponding to this dataset.",
         )
 
+        subparser.add_argument(
+            "--truly-multitask",
+            type=bool,
+            action="store_true",
+            help="Whether this model is truly multitask, meaning that we should "
+            "interpret input_file as a JSON string mapping the different data "
+            "keys to their respective files",
+        )
+
         subparser.set_defaults(func=evaluate_from_args)
 
         return subparser
@@ -169,6 +178,8 @@ def evaluate_from_args(args: argparse.Namespace) -> Dict[str, Any]:
 
     if args.data_key is not None:
         evaluation_data_path = {args.data_key: args.input_file}
+    elif args.truly_multitask:
+        evaluation_data_path = json.loads(args.input_file)
     else:
         evaluation_data_path = args.input_file
     logger.info("Reading evaluation data from %s", evaluation_data_path)
